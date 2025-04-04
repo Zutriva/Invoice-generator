@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="imageBase64.js"></script> <!-- Ensure this file exists -->
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            background-color: #f4f4f4;
+        }
+        #firstPage, #secondPage {
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h3 {
+            text-align: center;
+            color: #333;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            text-align: left;
+            margin-top: 10px;
+            padding-left: 10px;
+        }
+        input, select {
+            width: 98%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        .form-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            gap: 20px;
+        }
+        .form-group {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .form-group:last-child {
+            margin-right: 0;
+        }
+        button {
+            padding: 12px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        #firstPage button {
+            display: block;
+            margin-left: auto;
+            width: 20%;
+            margin-top: 15px;
+        }
+        #secondPage .button-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        #secondPage button {
+            width: 30%;
+            flex: 1;
+            padding: 12px;
+        }
+        #secondPage .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #paidDetailsBox {
+            display: none;
+        }
+        #previewDetails {
+            text-align: left;
+            max-width: 500px;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            background: #fff;
+        }
+        .previewSection {
+            margin-bottom: 15px;
+        }
+        #packAmount, #childPackAmount {
+            background-color: #f0f0f0;
+            pointer-events: none;
+        }
+        #childrenGroup, #childPackGroup {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="firstPage">
+        <h1 style="font-size: 40px;">ZUTRIVA</h1>
+        <h3 style="margin-top: -15px;">Invoice Generator</h3>
+        <div class="container">
+            <form id="invoiceForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Name:</label>
+                        <input type="text" id="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mobile">Mobile Number:</label>
+                        <input type="text" id="mobile" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="amount">Current Amount Pays in (₹):</label>
+                        <input type="number" id="amount" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="transactionId">Transaction ID:</label>
+                        <input type="text" id="transactionId" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="paymentMethod">Payment Method:</label>
+                        <select id="paymentMethod" required>
+                            <option value="gpay">GPAY</option>
+                            <option value="phonepay">PhonePay</option>
+                            <option value="paytm">PayTM</option>
+                            <option value="netbanking">NetBanking</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tourCategory">Tour Category:</label>
+                        <select id="tourCategory" required onchange="updateTourPlanOptions(); updatePackageAmount()">
+                            <option value="" disabled selected>Select Category</option>
+                            <option value="templeTour">Temple Tour</option>
+                            <option value="hillStation">Hill Station Tour</option>
+                            <option value="beachTour">Beach Tour</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tourType">Tour Type:</label>
+                        <select id="tourType" required onchange="updatePackageAmount(); toggleChildrenFields()">
+                            <option value="" disabled selected>Choose</option>
+                            <option value="couple">Couple Tour</option>
+                            <option value="family">Family Tour</option>
+                            <option value="group">Group Tour</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="NoOfpax">No. of Adults:</label>
+                        <input type="number" id="NoOfpax" required min="1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" id="childrenGroup">
+                        <label for="NoOfChildren">No. of Children:</label>
+                        <input type="number" id="NoOfChildren" required min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="tourPlan">Tour Planned For:</label>
+                        <select id="tourPlan" required onchange="updatePackageAmount()">
+                            <option value="" disabled selected>Select Tour</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="dateOfTravel">Date of Travel:</label>
+                        <input type="date" id="dateOfTravel" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="packAmount">Package Amount (Per Adult):</label>
+                        <input type="number" id="packAmount" readonly required value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" id="childPackGroup">
+                        <label for="childPackAmount">Package Amount (Per Child):</label>
+                        <input type="number" id="childPackAmount" readonly required value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentType">Paying As:</label>
+                        <select id="paymentType" onchange="showPaidOptions()" required>
+                            <option value="advance">Advance</option>
+                            <option value="fullSettlement">Balance Settle</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="paidOptions" style="display: none;">
+                    <label for="paidStatus">Advance Paid?</label>
+                    <select id="paidStatus" onchange="showPaidDetailsBox()" required>
+                        <option value="unpaid">No</option>
+                        <option value="paid">Yes</option>
+                    </select>
+                    <div id="paidDetailsBox" style="display: none;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="advancePaid">Advance Paid Amount in (₹):</label>
+                                <input type="number" id="advancePaid" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="AdvanceInvoiceNumber">Advance Payment Invoice No:</label>
+                                <input type="text" id="AdvanceInvoiceNumber" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" onclick="goToNextPage()">Next Page</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="secondPage" style="display:none;">
+        <h1>Invoice Preview</h1>
+        <div class="container">
+            <div id="previewDetails"></div>
+            <br>
+            <button onclick="editInvoice()">Edit</button>
+            <button onclick="savePDFAndNewInvoice()">Save & Next</button>
+        </div>
+    </div>
+
+    <script>
+        // Tour options based on category
+        const tourOptions = {
+            "templeTour": [
+                "Arupadai Murugan Temple Tour",
+                "Kanyakumari Temple Tour",
+                "Coimbatore Temple Tour",
+                "Chidambaram Temple Tour",
+                "Kumbakonam Temple Tour",
+                "Rameshwaram Temple Tour",
+                "Srirangam Temple Tour",
+                "Thanjavur Temple Tour",
+                "Thiruvannamalai Temple Tour",
+                "Velankanni Temple Tour"
+            ],
+            "hillStation": [
+                "Kolli Hills Station Trip",
+                "Kodaikanal Hills Station Trip",
+                "Ooty Hills Station Trip",
+                "Valparai Hills Station Trip",
+                "Yercaud Hills Station Trip"
+            ],
+            "beachTour": [
+                "Mahabalipuram Beach Journey",
+                "Dhanushkodi Beach Journey",
+                "Thoothukudi Beach Journey",
+                "Kanyakumari Beach Journey",
+                "Chidambaram Beach Journey",
+                "Velankanni Beach Journey"
+            ]
+        };
+
+        // Pricing structure from the second document (tour-specific prices)
+        const packagePrices = {
+            "couple": {
+                "Mahabalipuram Beach Journey": 17700,
+                "Dhanushkodi Beach Journey": 10900,
+                "Thoothukudi Beach Journey": 10100,
+                "Kanyakumari Beach Journey": 13000,
+                "Chidambaram Beach Journey": 16200,
+                "Velankanni Beach Journey": 12600,
+                "Kolli Hills Station Trip": 13600,
+                "Kodaikanal Hills Station Trip": 10000,
+                "Ooty Hills Station Trip": 12700,
+                "Valparai Hills Station Trip": 13300,
+                "Yercaud Hills Station Trip": 14300,
+                "Arupadai Murugan Temple Tour": 35500,
+                "Kanyakumari Temple Tour": 13000,
+                "Coimbatore Temple Tour": 11500,
+                "Chidambaram Temple Tour": 16200,
+                "Kumbakonam Temple Tour": 12500,
+                "Rameshwaram Temple Tour": 10900,
+                "Srirangam Temple Tour": 9300,
+                "Thanjavur Temple Tour": 11200,
+                "Thiruvannamalai Temple Tour": 15000,
+                "Velankanni Temple Tour": 13300
+            },
+            "family": {
+                "Mahabalipuram Beach Journey": 10800,
+                "Dhanushkodi Beach Journey": 7500,
+                "Thoothukudi Beach Journey": 8000,
+                "Kanyakumari Beach Journey": 9000,
+                "Chidambaram Beach Journey": 9900,
+                "Velankanni Beach Journey": 8200,
+                "Kolli Hills Station Trip": 8750,
+                "Kodaikanal Hills Station Trip": 7000,
+                "Ooty Hills Station Trip": 8300,
+                "Valparai Hills Station Trip": 8600,
+                "Yercaud Hills Station Trip": 9100,
+                "Arupadai Murugan Temple Tour": 22000,
+                "Kanyakumari Temple Tour": 9000,
+                "Coimbatore Temple Tour": 8000,
+                "Chidambaram Temple Tour": 9900,
+                "Kumbakonam Temple Tour": 8100,
+                "Rameshwaram Temple Tour": 7500,
+                "Srirangam Temple Tour": 7100,
+                "Thanjavur Temple Tour": 7500,
+                "Thiruvannamalai Temple Tour": 9500,
+                "Velankanni Temple Tour": 8200
+            },
+            "group": {
+                "Mahabalipuram Beach Journey": 6400,
+                "Dhanushkodi Beach Journey": 5000,
+                "Thoothukudi Beach Journey": 4800,
+                "Kanyakumari Beach Journey": 5300,
+                "Chidambaram Beach Journey": 6100,
+                "Velankanni Beach Journey": 5600,
+                "Kolli Hills Station Trip": 5500,
+                "Kodaikanal Hills Station Trip": 4800,
+                "Ooty Hills Station Trip": 5500,
+                "Valparai Hills Station Trip": 5800,
+                "Yercaud Hills Station Trip": 5700,
+                "Arupadai Murugan Temple Tour": 13600,
+                "Kanyakumari Temple Tour": 5300,
+                "Coimbatore Temple Tour": 5200,
+                "Chidambaram Temple Tour": 6100,
+                "Kumbakonam Temple Tour": 5300,
+                "Rameshwaram Temple Tour": 5000,
+                "Srirangam Temple Tour": 4700,
+                "Thanjavur Temple Tour": 5000,
+                "Thiruvannamalai Temple Tour": 5800,
+                "Velankanni Temple Tour": 8200
+            }
+        };
+
+        // Tour short codes mapping
+        const tourShortCodes = {
+            "Mahabalipuram Beach Journey": "MDU-MAH",
+            "Dhanushkodi Beach Journey": "MDU-DNK",
+            "Thoothukudi Beach Journey": "MDU-TT",
+            "Kanyakumari Beach Journey": "MDU-KNY",
+            "Chidambaram Beach Journey": "MDU-CCP",
+            "Velankanni Beach Journey": "MDU-VLK",
+            "Kolli Hills Station Trip": "MDU-KOL",
+            "Kodaikanal Hills Station Trip": "MDU-KQN",
+            "Ooty Hills Station Trip": "MDU-OOT",
+            "Valparai Hills Station Trip": "MDU-VLP",
+            "Yercaud Hills Station Trip": "MDU-YCD",
+            "Arupadai Murugan Temple Tour": "MDU-ARUPADAI",
+            "Kanyakumari Temple Tour": "MDU-CAPE",
+            "Coimbatore Temple Tour": "MDU-CBE",
+            "Chidambaram Temple Tour": "MDU-CDM",
+            "Kumbakonam Temple Tour": "MDU-KUM",
+            "Rameshwaram Temple Tour": "MDU-RAM",
+            "Srirangam Temple Tour": "MDU-SRGM",
+            "Thanjavur Temple Tour": "MDU-TJ",
+            "Thiruvannamalai Temple Tour": "MDU-TNM",
+            "Velankanni Temple Tour": "MDU-VKN"
+        };
+
+        // Function to update tour plan options based on selected category
+        function updateTourPlanOptions() {
+            const tourCategory = document.getElementById("tourCategory").value;
+            const tourPlanSelect = document.getElementById("tourPlan");
+            tourPlanSelect.innerHTML = '<option value="" disabled selected>Select Tour</option>';
+
+            if (tourCategory && tourOptions[tourCategory]) {
+                tourOptions[tourCategory].forEach(tour => {
+                    const option = document.createElement("option");
+                    option.value = tour;
+                    option.textContent = tour;
+                    tourPlanSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Function to update package amounts based on selections
+        function updatePackageAmount() {
+            const tourType = document.getElementById("tourType").value;
+            const tourPlan = document.getElementById("tourPlan").value;
+            const packAmountField = document.getElementById("packAmount");
+            const childPackAmountField = document.getElementById("childPackAmount");
+
+            if (!tourType || !tourPlan || tourType === "" || tourPlan === "") {
+                packAmountField.value = 0;
+                childPackAmountField.value = 0;
+            } else if (packagePrices[tourType] && packagePrices[tourType][tourPlan]) {
+                const adultPrice = packagePrices[tourType][tourPlan];
+                packAmountField.value = adultPrice;
+                childPackAmountField.value = (tourType === "couple") ? 0 : adultPrice * 0.5;
+            } else {
+                packAmountField.value = 0;
+                childPackAmountField.value = 0;
+            }
+        }
+
+        // Function to toggle visibility of children-related fields based on tour type
+        function toggleChildrenFields() {
+            const tourType = document.getElementById("tourType").value;
+            const childrenGroup = document.getElementById("childrenGroup");
+            const childPackGroup = document.getElementById("childPackGroup");
+
+            if (tourType === "couple") {
+                childrenGroup.style.display = "none";
+                childPackGroup.style.display = "none";
+                document.getElementById("NoOfChildren").value = 0; // Reset to 0 for couple
+            } else if (tourType === "family" || tourType === "group") {
+                childrenGroup.style.display = "block";
+                childPackGroup.style.display = "block";
+            } else {
+                childrenGroup.style.display = "none";
+                childPackGroup.style.display = "none";
+            }
+        }
+
+        // Show paid options when "Balance Settle" is selected
+        function showPaidOptions() {
+            var paymentType = document.getElementById("paymentType").value;
+            var paidOptions = document.getElementById("paidOptions");
+            if (paymentType === "fullSettlement") {
+                paidOptions.style.display = "block";
+            } else {
+                paidOptions.style.display = "none";
+                document.getElementById("paidStatus").value = "unpaid";
+                document.getElementById("paidDetailsBox").style.display = "none";
+            }
+        }
+
+        // Show advance payment details box
+        function showPaidDetailsBox() {
+            var paidStatus = document.getElementById("paidStatus").value;
+            var paidDetailsBox = document.getElementById("paidDetailsBox");
+            if (paidStatus === "paid") {
+                paidDetailsBox.style.display = "block";
+            } else {
+                paidDetailsBox.style.display = "none";
+            }
+        }
+
+        let invoiceNumber = '';
+        let serialNumber = parseInt(localStorage.getItem("invoiceSerial") || 1);
+
+        function generateInvoiceNumber(name) {
+            const now = new Date();
+            const year = now.getFullYear().toString().slice(2);
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            const firstLetter = name.charAt(0).toUpperCase();
+            const lastDate = localStorage.getItem("lastInvoiceDate");
+
+            if (lastDate !== `${year}-${month}-${date}`) {
+                serialNumber = 1;
+            }
+
+            localStorage.setItem("lastInvoiceDate", `${year}-${month}-${date}`);
+            localStorage.setItem("invoiceSerial", serialNumber);
+
+            const formattedSerial = String(serialNumber).padStart(2, '0');
+            return `TRZ${year}${month}${date}${formattedSerial}${firstLetter}`;
+        }
+
+        function goToNextPage() {
+            const name = document.getElementById('name').value;
+            const mobile = document.getElementById('mobile').value;
+            const amount = document.getElementById('amount').value;
+            const transactionId = document.getElementById('transactionId').value;
+            const paymentMethod = document.getElementById('paymentMethod').value;
+            const tourCategory = document.getElementById('tourCategory').value;
+            const tourType = document.getElementById('tourType').value;
+            const dateOfTravel = document.getElementById('dateOfTravel').value;
+            const tourPlan = document.getElementById('tourPlan').value;
+            const paymentType = document.getElementById('paymentType').value;
+            const paidStatusElement = document.getElementById('paidStatus');
+            const advancePaidElement = document.getElementById('advancePaid');
+            const NoOfpax = parseInt(document.getElementById('NoOfpax').value);
+            const NoOfChildren = parseInt(document.getElementById('NoOfChildren').value) || 0;
+            const packAmount = parseInt(document.getElementById('packAmount').value);
+            const childPackAmount = parseInt(document.getElementById('childPackAmount').value);
+
+            const paymentMethodDisplay = {
+                'gpay': 'GPAY', 'phonepay': 'PhonePay', 'paytm': 'PayTM', 'netbanking': 'NetBanking'
+            };
+            const tourCategoryDisplay = {
+                'templeTour': 'Temple Tour', 'hillStation': 'Hill Station', 'beachTour': 'Beach Tour'
+            };
+            const tourTypeDisplay = {
+                'couple': 'Couple Tour', 'family': 'Family Tour', 'group': 'Group Tour'
+            };
+
+            const displayPaymentMethod = paymentMethodDisplay[paymentMethod] || paymentMethod;
+            const displayTourCategory = tourCategoryDisplay[tourCategory] || tourCategory;
+            const displayTourType = tourTypeDisplay[tourType] || tourType;
+            const tourPlanShortCode = tourShortCodes[tourPlan] || tourPlan;
+
+            if (!name || !mobile || !amount || !transactionId || !paymentMethod || !paymentType || 
+                !tourCategory || !tourType || !dateOfTravel || !tourPlan || !NoOfpax || packAmount === 0) {
+                alert("Please fill in all required fields and select a valid tour with a package amount!");
+                return;
+            }
+
+            if (tourType === "couple" && NoOfpax !== 2) {
+                alert("Couple Tour must have exactly 2 adults!");
+                return;
+            }
+
+            if (tourType === "couple" && NoOfChildren > 0) {
+                alert("Couple Tour does not allow children!");
+                return;
+            }
+
+            if (paymentType === 'fullSettlement' && paidStatusElement.value === 'paid' && !advancePaidElement.value) {
+                alert("Please enter the advance paid amount.");
+                return;
+            }
+
+            if (paymentType === 'fullSettlement' && paidStatusElement.value === 'paid' && !document.getElementById('AdvanceInvoiceNumber').value) {
+                alert("Please enter an Advance Payment Invoice Number");
+                return;
+            }
+
+            if (!invoiceNumber) {
+                invoiceNumber = generateInvoiceNumber(name);
+            }
+
+            // Calculate total package amount based on adults and children
+            let totalPackageAmount;
+            if (tourType === "couple") {
+                totalPackageAmount = NoOfpax * packAmount; // No child pricing
+            } else { // family or group
+                totalPackageAmount = (NoOfpax * packAmount) + (NoOfChildren * childPackAmount);
+            }
+
+            // Calculate total amount paid
+            let totalAmountPaid = 0;
+            if (paymentType === 'advance') {
+                totalAmountPaid = parseFloat(amount);
+            } else if (paymentType === 'fullSettlement') {
+                if (paidStatusElement.value === 'paid') {
+                    totalAmountPaid = parseFloat(amount) + parseFloat(advancePaidElement.value);
+                } else {
+                    totalAmountPaid = parseFloat(amount);
+                }
+            }
+
+            // Calculate balance amount
+            let balanceAmount = totalPackageAmount - totalAmountPaid;
+
+            let previewContent = ` 
+                <div class="previewSection"><strong>Invoice Number:</strong> ${invoiceNumber}</div>
+                <div class="previewSection"><strong>Date:</strong> ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')} , ${new Date().toLocaleTimeString('en-GB', { hour12: true })}</div>
+                <div class="previewSection"><strong>Name:</strong> ${name.toUpperCase()}</div>
+                <div class="previewSection"><strong>Mobile Number:</strong> ${mobile}</div>
+                <div class="previewSection"><strong>Current Amount Pays in (₹):</strong> ₹${amount}</div>
+                <div class="previewSection"><strong>Transaction ID:</strong> ${transactionId}</div>
+                <div class="previewSection"><strong>Payment Method:</strong> ${displayPaymentMethod}</div>
+                <div class="previewSection"><strong>Tour Category:</strong> ${displayTourCategory}</div>
+                <div class="previewSection"><strong>Tour Type:</strong> ${displayTourType}</div>
+                <div class="previewSection"><strong>Date of Travel:</strong> ${dateOfTravel}</div>
+                <div class="previewSection"><strong>Tour Planned For:</strong> ${tourPlanShortCode}</div>
+                <div class="previewSection"><strong>No. of Adults:</strong> ${NoOfpax}</div>
+            `;
+
+            if (NoOfChildren > 0) {
+                previewContent += `
+                    <div class="previewSection"><strong>No. of Children:</strong> ${NoOfChildren}</div>
+                    <div class="previewSection"><strong>Per Child Package Amount:</strong> ₹${childPackAmount}</div>
+                `;
+            }
+
+            previewContent += `
+                <div class="previewSection"><strong>Per Adult Package Amount:</strong> ₹${packAmount}</div>
+                <div class="previewSection"><strong>Total Package Amount:</strong> ₹${totalPackageAmount}</div>
+                <div class="previewSection"><strong>Paying As:</strong> ${paymentType === 'fullSettlement' ? 'Balance Settle' : 'Advance'}</div>
+            `;
+
+            if (paymentType === 'fullSettlement') {
+                previewContent += `
+                    <div class="previewSection"><strong>Advance Paid? :</strong> ${paidStatusElement.value === 'paid' ? 'Yes, Advance Paid.' : 'No, full settle.'}</div>
+                `;
+                if (paidStatusElement.value === 'paid') {
+                    previewContent += `
+                        <div class="previewSection"><strong>Advance Paid Amount:</strong> ₹${advancePaidElement.value}</div>
+                        <div class="previewSection"><strong>Advance Payment Invoice No:</strong> ${document.getElementById('AdvanceInvoiceNumber').value.toUpperCase()}</div>
+                    `;
+                }
+            }
+
+            previewContent += `
+                <div class="previewSection"><strong>Total Amount Paid:</strong> ₹${totalAmountPaid}</div>
+                <div class="previewSection"><strong>Balance Amount to Pay:</strong> ₹${balanceAmount}</div>
+            `;
+
+            document.getElementById('previewDetails').innerHTML = previewContent;
+            document.getElementById('firstPage').style.display = 'none';
+            document.getElementById('secondPage').style.display = 'block';
+        }
+
+        function editInvoice() {
+            document.getElementById('secondPage').style.display = 'none';
+            document.getElementById('firstPage').style.display = 'block';
+        }
+
+        function savePDFAndNewInvoice() {
+            console.log("savePDFAndNewInvoice called"); // Debug log
+            console.log("jsPDF available:", window.jspdf); // Check if jsPDF is loaded
+
+            if (!window.jspdf) {
+                alert("jsPDF library failed to load. Please check your internet connection or the script source.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            let doc;
+
+            try {
+                doc = new jsPDF();
+                console.log("jsPDF instance created"); // Debug log
+
+                // Check if base64Image is available
+                if (typeof base64Image === 'undefined' || !base64Image) {
+                    console.log("Background image not loaded, proceeding without it"); // Debug log
+                } else {
+                    doc.addImage(base64Image, 'JPEG', 0, 0, 210, 297);
+                    console.log("Background image added"); // Debug log
+                }
+
+                const name = document.getElementById('name').value;
+                const mobile = document.getElementById('mobile').value;
+                const amount = document.getElementById('amount').value;
+                const transactionId = document.getElementById('transactionId').value;
+                const paymentMethod = document.getElementById('paymentMethod').value;
+                const tourCategory = document.getElementById('tourCategory').value;
+                const tourType = document.getElementById('tourType').value;
+                const NoOfpax = parseInt(document.getElementById('NoOfpax').value);
+                const NoOfChildren = parseInt(document.getElementById('NoOfChildren').value) || 0;
+                const packAmount = parseInt(document.getElementById('packAmount').value);
+                const childPackAmount = parseInt(document.getElementById('childPackAmount').value);
+                const dateOfTravel = document.getElementById('dateOfTravel').value;
+                const tourPlan = document.getElementById('tourPlan').value;
+                const paymentType = document.getElementById('paymentType').value;
+                const paidStatus = document.getElementById('paidStatus').value;
+
+                const paymentMethodDisplay = {
+                    'gpay': 'GPAY', 'phonepay': 'PhonePay', 'paytm': 'PayTM', 'netbanking': 'NetBanking'
+                };
+                const tourCategoryDisplay = {
+                    'templeTour': 'Temple Tour', 'hillStation': 'Hill Station', 'beachTour': 'Beach Tour'
+                };
+                const tourTypeDisplay = {
+                    'couple': 'Couple Tour', 'family': 'Family Tour', 'group': 'Group Tour'
+                };
+                const tourPlanShortCode = tourShortCodes[tourPlan] || tourPlan;
+
+                // Calculate total package amount
+                let totalPackageAmount;
+                if (tourType === "couple") {
+                    totalPackageAmount = NoOfpax * packAmount;
+                } else {
+                    totalPackageAmount = (NoOfpax * packAmount) + (NoOfChildren * childPackAmount);
+                }
+
+                // Calculate total amount paid (declare at function scope)
+                let totalAmountPaid = 0;
+                if (paymentType === 'advance') {
+                    totalAmountPaid = parseFloat(amount);
+                } else if (paymentType === 'fullSettlement') {
+                    if (paidStatus === 'paid') {
+                        totalAmountPaid = parseFloat(amount) + parseFloat(document.getElementById('advancePaid').value);
+                    } else {
+                        totalAmountPaid = parseFloat(amount);
+                    }
+                }
+
+                doc.setFont("times", "bold");
+                doc.setFontSize(15);
+                let yPosition = 42;
+                doc.text("INVOICE No: " + invoiceNumber, 45, yPosition);
+                yPosition += 10;
+                doc.text("NAME: " + name.toUpperCase(), 45, yPosition);
+                doc.setFontSize(13);
+                yPosition += 10;
+                doc.text("Mobile: " + mobile, 45, yPosition);
+                yPosition += 10;
+
+                doc.setFont("times", "normal");
+                doc.setFontSize(13);
+                yPosition = 85;
+                doc.text("Date of Travel: " + dateOfTravel, 37, yPosition);
+                yPosition += 10;
+                doc.text("Tour Category: " + tourCategoryDisplay[tourCategory], 37, yPosition);
+                yPosition += 10;
+                doc.text("Tour Type: " + tourTypeDisplay[tourType], 37, yPosition);
+                yPosition += 10;
+                doc.text("Tour Planned: " + tourPlanShortCode, 37, yPosition);
+                yPosition += 10;
+                doc.text("Per Adult Price: Rs. " + packAmount, 37, yPosition);
+                if (NoOfChildren > 0) {
+                    yPosition += 10;
+                    doc.text("Per Child Price: Rs. " + childPackAmount, 37, yPosition);
+                }
+
+                yPosition += 10;
+                doc.text("Total Package Amount: Rs. " + totalPackageAmount, 37, yPosition);
+
+                yPosition = 55;
+                doc.setFontSize(12);
+                doc.text("Date: " + new Date().toLocaleString(), 146, yPosition);
+                doc.setFont("times", "normal");
+                doc.setFontSize(13);
+                yPosition = 85;
+                doc.text("Txn ID: " + transactionId, 112, yPosition);
+                yPosition += 10;
+                doc.text("Payment Method: " + paymentMethodDisplay[paymentMethod], 112, yPosition);
+                yPosition += 10;
+                doc.text("Paying As: " + (paymentType === 'fullSettlement' ? 'Balance Settle' : 'Advance'), 112, yPosition);
+                yPosition += 10;
+                doc.text("No. of Adults: " + NoOfpax, 112, yPosition);
+                if (NoOfChildren > 0) {
+                    yPosition += 10;
+                    doc.text("No. of Children: " + NoOfChildren, 112, yPosition);
+                }
+
+                if (paymentType === 'fullSettlement') {
+                    yPosition += 10;
+                    doc.text("Advance Paid? : " + (paidStatus === 'paid' ? 'Yes' : 'No, full settle'), 112, yPosition);
+                    if (paidStatus === 'paid') {
+                        yPosition += 10;
+                        const advanceInvoiceNumber = document.getElementById('AdvanceInvoiceNumber').value;
+                        doc.text("Adv. Inv. No: " + advanceInvoiceNumber.toUpperCase(), 112, yPosition);
+                        yPosition += 10;
+                        const advancePaidAmount = document.getElementById('advancePaid').value;
+                        yPosition = 163;
+                        doc.text("Advance Amount Paid: ", 37, yPosition);
+                        doc.setFontSize(13);
+                        doc.text("Rs." + advancePaidAmount + " /-", 150, yPosition);
+                    }
+                }
+
+                yPosition = 173;
+                doc.text("Current Amount Pays: ", 37, yPosition);
+                doc.setFontSize(13);
+                doc.text("Rs." + amount + " /-", 150, yPosition);
+
+                doc.setFont("times", "bold");
+                doc.setFontSize(13);
+                doc.text("Total Amount Paid: ", 98, yPosition = 200);
+                doc.text("Rs." + totalAmountPaid.toString() + " /-", 150, yPosition);
+
+                let balanceAmount = totalPackageAmount - totalAmountPaid;
+                doc.setFont("times", "normal");
+                doc.setFontSize(13);
+                doc.text("Balance Amount To Pay: ", 37, yPosition = 183);
+                doc.text("Rs." + balanceAmount.toString() + " !", 150, yPosition);
+
+                const last4DigitsMobile = mobile.slice(-4);
+                const filename = `invoice_${invoiceNumber}_${name.toUpperCase().slice(0, 4)}${last4DigitsMobile}_BAL-${balanceAmount}`;
+                doc.save(`${filename}.pdf`);
+                console.log("PDF saved as:", filename); // Debug log
+
+                document.getElementById('invoiceForm').reset();
+                serialNumber++;
+                localStorage.setItem("invoiceSerial", serialNumber);
+                location.reload();
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                alert("An error occurred while generating the PDF. Check the console for details.");
+            }
+        }
+
+        // Initialize on page load
+        updateTourPlanOptions();
+        updatePackageAmount();
+        toggleChildrenFields();
+    </script>
+</body>
+</html>
